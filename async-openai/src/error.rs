@@ -44,7 +44,7 @@ impl std::fmt::Display for ApiError {
         let mut parts = Vec::new();
 
         if let Some(r#type) = &self.r#type {
-            parts.push(format!("{}:", r#type));
+            parts.push(format!("{type}:"));
         }
 
         parts.push(self.message.clone());

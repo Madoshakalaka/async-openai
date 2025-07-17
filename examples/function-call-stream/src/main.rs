@@ -6,7 +6,7 @@ use async_openai::types::{
     ChatCompletionRequestFunctionMessageArgs, ChatCompletionRequestUserMessageArgs, FinishReason,
 };
 use async_openai::{
-    types::{ChatCompletionFunctionsArgs, CreateChatCompletionRequestArgs},
+    types::{ChatCompletionToolArgs, CreateChatCompletionRequestArgs, FunctionObjectArgs},
     Client,
 };
 
@@ -27,22 +27,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .content("What's the weather like in Boston?")
             .build()?
             .into()])
-        .functions([ChatCompletionFunctionsArgs::default()
-            .name("get_current_weather")
-            .description("Get the current weather in a given location")
-            .parameters(json!({
-                "type": "object",
-                "properties": {
-                    "location": {
-                        "type": "string",
-                        "description": "The city and state, e.g. San Francisco, CA",
+        .tools([ChatCompletionToolArgs::default()
+            .function(FunctionObjectArgs::default()
+                .name("get_current_weather")
+                .description("Get the current weather in a given location")
+                .parameters(json!({
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA",
+                        },
+                        "unit": { "type": "string", "enum": ["celsius", "fahrenheit"] },
                     },
-                    "unit": { "type": "string", "enum": ["celsius", "fahrenheit"] },
-                },
-                "required": ["location"],
-            }))
+                    "required": ["location"],
+                }))
+                .build()?)
             .build()?])
-        .function_call("auto")
+        .tool_choice("auto")
         .build()?;
 
     let mut stream = client.chat().create_stream(request).await?;
@@ -55,17 +57,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
         match result {
             Ok(response) => {
                 for chat_choice in response.choices {
-                    if let Some(fn_call) = &chat_choice.delta.function_call {
-                        writeln!(lock, "function_call: {:?}", fn_call).unwrap();
-                        if let Some(name) = &fn_call.name {
-                            fn_name.clone_from(name);
-                        }
-                        if let Some(args) = &fn_call.arguments {
-                            fn_args.push_str(args);
+                    if let Some(tool_calls) = &chat_choice.delta.tool_calls {
+                        for tool_call in tool_calls {
+                            if let Some(function) = &tool_call.function {
+                                writeln!(lock, "function_call: {:?}", function).unwrap();
+                                if let Some(name) = &function.name {
+                                    fn_name.clone_from(name);
+                                }
+                                if let Some(args) = &function.arguments {
+                                    fn_args.push_str(args);
+                                }
+                            }
                         }
                     }
                     if let Some(finish_reason) = &chat_choice.finish_reason {
-                        if matches!(finish_reason, FinishReason::FunctionCall) {
+                        if matches!(finish_reason, FinishReason::ToolCalls) {
                             call_fn(&client, &fn_name, &fn_args).await?;
                         }
                     } else if let Some(content) = &chat_choice.delta.content {

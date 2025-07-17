@@ -271,7 +271,7 @@ mod test {
                 },
             )],
             ..Default::default()
-        });
+        }).await;
     }
 
     #[tokio::test]
@@ -285,7 +285,7 @@ mod test {
         let _ = dynamic_dispatch_compiles(&azure_client).await;
         let _ = dynamic_dispatch_compiles(&oai_client).await;
 
-        let _ = tokio::spawn(async move { dynamic_dispatch_compiles(&azure_client).await });
-        let _ = tokio::spawn(async move { dynamic_dispatch_compiles(&oai_client).await });
+        tokio::spawn(async move { dynamic_dispatch_compiles(&azure_client).await });
+        tokio::spawn(async move { dynamic_dispatch_compiles(&oai_client).await });
     }
 }

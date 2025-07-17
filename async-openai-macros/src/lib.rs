@@ -69,7 +69,7 @@ pub fn byot(args: TokenStream, item: TokenStream) -> TokenStream {
                 FnArg::Receiver(receiver) => receiver.to_token_stream(),
                 FnArg::Typed(PatType { pat, .. }) => {
                     if let Pat::Ident(pat_ident) = &**pat {
-                        let generic_name = format!("T{}", param_count);
+                        let generic_name = format!("T{param_count}");
                         let generic_ident =
                             syn::Ident::new(&generic_name, proc_macro2::Span::call_site());
 
@@ -106,7 +106,7 @@ pub fn byot(args: TokenStream, item: TokenStream) -> TokenStream {
     new_generics.params.extend(new_params);
 
     let fn_name = &input.sig.ident;
-    let byot_fn_name = syn::Ident::new(&format!("{}_byot", fn_name), fn_name.span());
+    let byot_fn_name = syn::Ident::new(&format!("{fn_name}_byot"), fn_name.span());
     let vis = &input.vis;
     let block = &input.block;
     let attrs = &input.attrs;

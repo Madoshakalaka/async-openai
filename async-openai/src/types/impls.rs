@@ -16,7 +16,7 @@ use bytes::Bytes;
 use super::{
     responses::{CodeInterpreterContainer, Input, InputContent, Role as ResponsesRole},
     AddUploadPartRequest, AudioInput, AudioResponseFormat, ChatCompletionFunctionCall,
-    ChatCompletionFunctions, ChatCompletionNamedToolChoice, ChatCompletionRequestAssistantMessage,
+    ChatCompletionNamedToolChoice, ChatCompletionRequestAssistantMessage,
     ChatCompletionRequestAssistantMessageContent, ChatCompletionRequestDeveloperMessage,
     ChatCompletionRequestDeveloperMessageContent, ChatCompletionRequestFunctionMessage,
     ChatCompletionRequestMessage, ChatCompletionRequestMessageContentPartAudio,
@@ -531,15 +531,6 @@ impl From<String> for ChatCompletionToolChoiceOption {
     }
 }
 
-impl From<(String, serde_json::Value)> for ChatCompletionFunctions {
-    fn from(value: (String, serde_json::Value)) -> Self {
-        Self {
-            name: value.0,
-            description: None,
-            parameters: value.1,
-        }
-    }
-}
 
 // todo: write macro for bunch of same looking From trait implementations below
 

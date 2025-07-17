@@ -1,7 +1,7 @@
 use async_openai::{
     types::{
-        ChatCompletionFunctionsArgs, ChatCompletionRequestFunctionMessageArgs,
-        ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs,
+        ChatCompletionRequestFunctionMessageArgs, ChatCompletionRequestUserMessageArgs,
+        ChatCompletionToolArgs, CreateChatCompletionRequestArgs, FunctionObjectArgs,
     },
     Client,
 };
@@ -32,22 +32,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .content("What's the weather like in Boston?")
             .build()?
             .into()])
-        .functions([ChatCompletionFunctionsArgs::default()
-            .name("get_current_weather")
-            .description("Get the current weather in a given location")
-            .parameters(json!({
-                "type": "object",
-                "properties": {
-                    "location": {
-                        "type": "string",
-                        "description": "The city and state, e.g. San Francisco, CA",
+        .tools([ChatCompletionToolArgs::default()
+            .function(FunctionObjectArgs::default()
+                .name("get_current_weather")
+                .description("Get the current weather in a given location")
+                .parameters(json!({
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA",
+                        },
+                        "unit": { "type": "string", "enum": ["celsius", "fahrenheit"] },
                     },
-                    "unit": { "type": "string", "enum": ["celsius", "fahrenheit"] },
-                },
-                "required": ["location"],
-            }))
+                    "required": ["location"],
+                }))
+                .build()?)
             .build()?])
-        .function_call("auto")
+        .tool_choice("auto")
         .build()?;
 
     let response_message = client
@@ -60,46 +62,48 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .message
         .clone();
 
-    if let Some(function_call) = response_message.function_call {
-        let mut available_functions: HashMap<&str, fn(&str, &str) -> serde_json::Value> =
-            HashMap::new();
-        available_functions.insert("get_current_weather", get_current_weather);
-        let function_name = function_call.name;
-        let function_args: serde_json::Value = function_call.arguments.parse().unwrap();
+    if let Some(tool_calls) = response_message.tool_calls {
+        if let Some(tool_call) = tool_calls.first() {
+            let mut available_functions: HashMap<&str, fn(&str, &str) -> serde_json::Value> =
+                HashMap::new();
+            available_functions.insert("get_current_weather", get_current_weather);
+            let function_name = &tool_call.function.name;
+            let function_args: serde_json::Value = tool_call.function.arguments.parse().unwrap();
 
-        let location = function_args["location"].as_str().unwrap();
-        let unit = "fahrenheit";
-        let function = available_functions.get(function_name.as_str()).unwrap();
-        let function_response = function(location, unit);
+            let location = function_args["location"].as_str().unwrap();
+            let unit = "fahrenheit";
+            let function = available_functions.get(function_name.as_str()).unwrap();
+            let function_response = function(location, unit);
 
-        let message = vec![
-            ChatCompletionRequestUserMessageArgs::default()
-                .content("What's the weather like in Boston?")
-                .build()?
-                .into(),
-            ChatCompletionRequestFunctionMessageArgs::default()
-                .content(function_response.to_string())
-                .name(function_name)
-                .build()?
-                .into(),
-        ];
+            let message = vec![
+                ChatCompletionRequestUserMessageArgs::default()
+                    .content("What's the weather like in Boston?")
+                    .build()?
+                    .into(),
+                ChatCompletionRequestFunctionMessageArgs::default()
+                    .content(function_response.to_string())
+                    .name(function_name.clone())
+                    .build()?
+                    .into(),
+            ];
 
-        println!("{}", serde_json::to_string(&message).unwrap());
+            println!("{}", serde_json::to_string(&message).unwrap());
 
-        let request = CreateChatCompletionRequestArgs::default()
-            .max_tokens(512u32)
-            .model(model)
-            .messages(message)
-            .build()?;
+            let request = CreateChatCompletionRequestArgs::default()
+                .max_tokens(512u32)
+                .model(model)
+                .messages(message)
+                .build()?;
 
-        let response = client.chat().create(request).await?;
+            let response = client.chat().create(request).await?;
 
-        println!("\nResponse:\n");
-        for choice in response.choices {
-            println!(
-                "{}: Role: {}  Content: {:?}",
-                choice.index, choice.message.role, choice.message.content
-            );
+            println!("\nResponse:\n");
+            for choice in response.choices {
+                println!(
+                    "{}: Role: {}  Content: {:?}",
+                    choice.index, choice.message.role, choice.message.content
+                );
+            }
         }
     }
 
