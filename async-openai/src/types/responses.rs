@@ -2132,7 +2132,6 @@ pub struct ContentPart {
 // ===== RESPONSE COLLECTOR =====
 
 /// Collects streaming response events into a complete response
-
 /// Output text annotation added event
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[non_exhaustive]
